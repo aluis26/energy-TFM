@@ -1,0 +1,493 @@
+##INTRODUCTION
+Assessing the value of energy efficiency improvements can be challenging as there's no way to truly know how much energy a building would have used without the improvements. The best we can do is to build counterfactual models. Once a building is overhauled the new (lower) energy consumption is compared against modeled values for the original building to calculate the savings from the retrofit. More accurate models could support better market incentives and enable lower cost financing.
+
+This competition challenges you to build these counterfactual models across four energy types based on historic usage rates and observed weather. The dataset includes three years of hourly meter readings from over one thousand buildings at several different sites around the world.
+
+## Exploratory Analysis
+
+During this first fase of the project a exploration of the data provided will be carried out. 
+Some elementary questions are expected to be answered during this process:
+* Which is the data are we facing with?
+* Does it have missing values or outliers that needed to be treated?
+* Which seemed to be the correlation between variables?
+* Which new features can be relevant for the case?
+
+###Setup the software
+https://www.kaggle.com/jaseziv83/a-deep-dive-eda-into-all-variables
+https://www.kaggle.com/etsc9287/a-thorough-eda-on-ashrae
+ggplot2 styles:
+https://www.datanovia.com/en/blog/the-a-z-of-rcolorbrewer-palette/#install-and-load-rcolorbrewer-package
+https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/#change-legend-title
+
+The software used for the development of the study and the writing of the report is RStudio [2]. The first step is to define the work directory and to load the libraries: readr[3], dplyr[4], miscTools[5], ggplot2 [6], reshape2[7], ggpubr[8].
+```{r warning=FALSE, results="hide", message=FALSE} 
+#Set Libraries:
+library("readr")
+library("dplyr")
+library("miscTools")
+library ("ggplot2")
+library("lubridate")
+library("tibble")
+library("scales")
+library("RColorBrewer")
+library("reshape2")
+```
+##Data
+
+5 datasets are provided to explore and create a model to solve this competition. A sixth one is given as a sample submission. They will be explored one by one.
+
+###Train.csv:
+This is the main dataset. Some introductory information about the variables is already given:
+
+There are 4 variables in the train data
+* *building_id*: Unique identification of the buildings, foreign key belonging to the building metadata.
+* *meter*: id code of the meter. There are 4 types {0: electricity, 1: chilledwater, 2: steam, 3: hotwater}. Not every building has all meter types.
+* *timestamp*: Datetime where the measurament was taken.
+* *meter_reading*: This is the target variable. Energy consumption in kWh (or equivalent).
+
+```{r warning=FALSE, results="hide", message=FALSE} 
+#load the data:
+library(readr)
+train <- read_csv("data/train.csv")
+```
+```{r}
+set.seed(2)
+selected_id <- sample(unique(train$building_id),350, replace=FALSE)
+train <- train[train$building_id %in% selected_id,]
+```
+We can have some general information about our data set:
+```{r}
+str(train)
+```
+```{r}
+summary(train)
+```
+
+```{r}
+nrow(train)
+```
+
+```{r}
+#Number of unique ID in the dataset:
+uniqueID<-(unique(train["building_id"]))
+nrow(uniqueID)
+```
+
+```{r}
+#Types of meter for each building
+#Create an empty table and add the unique building IDs 
+types_of_meter <- data.frame(matrix(ncol = 5, nrow =nrow(uniqueID[1])))
+x <- c("building_id", "0", "1","2","3")
+colnames(types_of_meter) <- x   
+types_of_meter["building_id"] <-uniqueID[1]
+
+#Iterate among the unique building IDs an select their unique meters:
+for (i in uniqueID$building_id) {
+  selected_building_meters <- train %>% filter(building_id == i)
+  unique_meters <-unique(selected_building_meters$meter)%>% sort()
+  
+#Fill the types_of_meter table with the meters that each building have:
+  for(j in 0:3){
+    if(max(unique_meters==j)== 0){
+       types_of_meter[types_of_meter$building_id== i, as.character(j)] = FALSE
+    }else{types_of_meter[types_of_meter$building_id== i, as.character(j)] = TRUE}
+  }
+}
+
+#Change the column names:
+colnames(types_of_meter) <- c("building_id","electricity","chilledwater","steam","hotwater")
+
+#Create a graph with the count of each meter:
+total_meter <- summarise(types_of_meter, sum_electricity= sum(electricity), sum_chilledwater=sum(chilledwater), sum_steam=sum(steam), sum_hotwater=sum(hotwater))
+total_meter <-data.frame(t(total_meter)) %>% rownames_to_column("meter")
+colnames(total_meter)<- c("Meter","Count")
+
+#Add the percentages:
+total_meter$percentage <- NA
+
+for(i in 1:4){
+  total_meter[i,3] <- percent(total_meter[i,2]/nrow(uniqueID),1)
+}
+
+```
+
+```{r fig.cap = ""}
+#plot the results:
+ggplot(total_meter,aes(Meter,Count)) + 
+    geom_col(position = 'dodge', aes(fill = Meter)) +
+    geom_text(aes(label=percentage), vjust=-0.1) + 
+    theme(legend.position = "none") +
+    labs(title="Count of meters") +
+    scale_color_brewer(palette = "Dark2")
+
+```
+
+
+From this dataset we can still get more relevant information. 
+Distribution of the meter reading electricity:
+```{r}
+#Change the name of the meter to make it more readable and understandable:
+train$meter <- plyr::mapvalues(train$meter, from = c(0, 1, 2, 3), to = c("electricity", "chilledwater", "steam", "hotwater"))
+```
+
+```{r fig.cap = ""}
+#Plot:
+ train %>% group_by(meter)%>%
+  ggplot(aes(meter_reading)) +
+  geom_histogram() +
+  theme(legend.position = "none") +
+  ylab("Count") +
+  ggtitle("Distribution of Meter Readings") +
+  facet_wrap(~ meter, scales = "free") +
+  aes(fill= as.factor(meter)) +
+  scale_fill_manual(values = c("#1B9E77","#D95F02","#7570B3","#E7298A"))
+
+```
+From the previous graph can be clearly seen how the meter readings for each of the types of meter follow a exponential distribution concentrating their frequency in the lower values.
+In this cases, applying the logarithm with base can g
+
+log_10(100) = 2. logaritma en base 10 de 100. a quin numero s'ha d'elevar 10 per tal que doni 100.
+10^2 = 100
+```{r fig.cap = ""}
+#Create a new variable with the log of the meter reading:
+train["meter_log"] <- log(train["meter_reading"],10) 
+
+#Plot the new variable:
+train[!is.infinite(train$meter_log),] %>% group_by(meter)%>%
+  ggplot(aes(meter_log)) +
+  geom_histogram(aes(fill= as.factor(meter))) +
+  ylab("Count") +
+  ggtitle("Logarithmic Distribution of Meter Readings by meter") +
+  geom_vline(xintercept = mean(train[!is.infinite(train$meter_log),]$meter_log, na.rm = T)) +
+  facet_wrap(~ meter, scales = "free") + 
+  scale_color_brewer(palette = "Dark2")
+
+
+```
+According to the graph, the distributions for the four meters seem to be normal. Chilledwater and steam are skewed to the right which can be an indicator of the presence of outliers. Further explorations to determine how to treat this outliers will be done.
+
+
+- Distribution of the average meter reading throught the year:
+
+```{r}
+train  <- train %>% mutate(timestamp_date = ymd(gsub( " .*$", "", timestamp)),
+                          timestamp_month = month(timestamp_date),
+                          timestamp_day = wday(timestamp_date, label = T, abbr = T),
+                          timestamp_day_number = day(timestamp_date),
+                          time_ymd_hms = ymd_hms(timestamp),
+                          time_hour = hour(time_ymd_hms))
+
+```
+
+```{r}
+# Plot the daily aggregates per each meter type. MEAN to understand how they change, Median to smooth and remove the outliers.
+train %>% 
+  group_by(meter, timestamp_date) %>% 
+  summarise(sum_reading = mean(meter_reading, na.rm = T)) %>% 
+  ggplot(aes(x= timestamp_date, y= sum_reading)) +
+  geom_line() +
+  geom_smooth(se = T) +
+  facet_wrap(~meter, scales = "free") +
+  ggtitle("Historical daily meter readings per meter type") +
+  labs(x= "Reading Date", y= "Sum Reading")
+
+
+```
+Electricity es el mes estable amb menys outliers, mentres que els altres tres en tenen mes.
+```{r}
+# Plot the daily aggregates per each meter type. MEDIAN to understand how they change, Median to smooth and remove the outliers.
+train %>% 
+  group_by(meter, timestamp_date) %>% 
+  summarise(median_reading = median(meter_reading, na.rm = T)) %>% 
+  ggplot(aes(x= timestamp_date, y= median_reading)) +
+  geom_line() +
+  geom_smooth(se = T) +
+  facet_wrap(~meter, scales = "free") +
+  ggtitle("Historical daily meter readings per meter type") +
+  labs(x= "Reading Date", y= "Median Reading")
+
+```
+Et dona una idea la mediana de com varia el consum tipic. Es el punt mig de totes les mesures durant el dia. Es molt robusta a outliers.
+Veiem clarament que hi ha molta variabilitat i que el tipus de industria influeix molt.
+Per tant fem el merge amb la taula dels buildings i comencem a treballar amb ella
+```{r}
+building_metadata <- read_csv("data/building_metadata.csv")
+```
+
+```{r}
+str(building_metadata)
+```
+
+- *site_id* - Foreign key for the weather files.
+- *building_id* - Foreign key for training.csv
+- *primary_use* - Indicator of the primary category of activities for the building based on EnergyStar property type definitions
+- *square_feet* - Gross floor area of the building
+- *year_built* - Year building was opened
+- *floor_count* - Number of floors of the building
+
+```{r}
+summary(building_metadata)
+```
+Switch from feets to meters for better understanding
+```{r}
+building_metadata$square_meters <- building_metadata$square_feet * 0.0929030 
+```
+
+Estudi de les diferents variables del dataset:
+-Primary use building:
+```{r}
+building_metadata %>% count(primary_use)%>% 
+  ggplot(aes(x= reorder(primary_use, n), y= n)) +
+  geom_col() +
+  theme(legend.position = "none") +
+  ylab("Count") +
+  ggtitle("Count of primary use building") +
+  coord_flip()
+```
+
+```{r}
+df <-building_metadata %>% count(primary_use)%>%arrange(desc(n))%>% mutate(percentage = percent(n/sum(n),1)) 
+df
+```
+El segment on es troben concentrats la majoria d'edificis es en la Educació, oficines, edificis públics i edificis residencials. Aquests formen el 91% dels edificis.
+
+
+- Size of the building:
+
+```{r}
+building_metadata %>% 
+  ggplot(aes(x= square_meters)) +
+  geom_density(adjust = 2, alpha = 0.7) +
+  scale_x_continuous(labels = comma, name = "Building Square Feet") +
+  ggtitle("BUILDING SIZE IS POSITIVELY SKEWED", subtitle = paste0("The median size is ", comma(median(building_metadata$square_meters)), " square meters")) +
+  theme(axis.title.y = element_blank(), axis.text.y = element_blank())
+```
+
+```{r fig.cap = ""}
+
+building_metadata%>% group_by(primary_use)%>%
+  ggplot(aes(square_meters)) +
+  geom_histogram(aes(x = square_meters, y = ..ncount..)) +
+  scale_y_continuous(labels = percent_format())+
+  ylab("Count") +
+  ggtitle("") +
+  facet_wrap(~ primary_use) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+- year built:
+```{r}
+#creem una nova variable que ens calculi en anys quina antiguetat te l'edifici:
+building_metadata$age <- 2016 - building_metadata$year_built
+
+building_metadata %>% 
+  distinct(building_id, .keep_all = T) %>% 
+  group_by(age) %>% 
+  summarise(n_buildings = n()) %>%
+  ggplot(aes(x= age, y= n_buildings)) +
+  geom_col() +
+  scale_y_continuous(name = "Number Built", breaks = seq(0,60,10)) +
+  scale_x_continuous(name = "Ages", breaks = seq(0,120,10)) 
+
+```
+Segurament l'edat de un edifici serà de alt valor per les prediccions de gasto de energia.
+https://www.revistaciencia.amc.edu.mx/images/revista/67_4/PDF/VidaUtilEdificios.pdf
+segons la taula i agafant com a estandard pel tipus de edificis majoritaris la vida util alta. Podem segmentar la edat dels edificis en aquests grups:
+
+```{r fig.cap = ""}
+building_metadata$ageGroup <- findInterval(building_metadata$age, c(25, 60, 120 )) 
+building_metadata$ageGroup <- replace(building_metadata$ageGroup, building_metadata$ageGroup == 0, "new" )
+building_metadata$ageGroup <- replace(building_metadata$ageGroup, building_metadata$ageGroup == 1, "medium" )
+building_metadata$ageGroup <- replace(building_metadata$ageGroup, building_metadata$ageGroup == 2, "old" )
+```
+
+
+```{r}
+building_metadata %>% 
+  distinct(building_id, .keep_all = T) %>% 
+  group_by(ageGroup) %>% 
+  summarise(n_buildings = n()) %>%
+  ggplot(aes(x= ageGroup, y= n_buildings)) +
+  geom_col() +
+  scale_y_continuous(name = "Number Built")
+```
+
+
+
+##################################################
+Let's merge the two datasets
+```{r}
+data_train <- merge(train, building_metadata, by='building_id')
+```
+
+Correlation between variables:
+```{r}
+
+Corr <- data_train %>% select (meter_reading, floor_count, age, square_feet) %>% na.omit() %>% cor() %>% as.data.frame()
+
+Corr
+```
+There is a positive correlation between the size (square_feet and floor_count) and the meter reading.The age of the building seems to be less linearly correlated with this.
+
+Let's see if differences can be found between types of meter:
+
+```{r}
+corrForMeter <- data.frame(row.names = c("meter_reading", "floor_count", "age", "square_feet"))
+
+for (i in (unique(data_train$meter))){
+data <- data_train %>% filter(meter == i) %>% select (meter_reading, floor_count, age, square_feet) %>% na.omit() %>% cor() %>% as.data.frame() %>% select(meter_reading)
+names(data) <- i
+corrForMeter <- cbind(corrForMeter, data)}
+
+corrForMeter
+
+```
+
+######################
+
+WEATHER TRAIN DATASET:
+```{r}
+weather_train <- read_csv("data/weather_train.csv")
+View(weather_train)
+
+```
+             
+```{r}
+str(weather_train)
+```
+
+
+Weather data from a meteorological station as close as possible to the site.
+
+site_id 
+air_temperature - Degrees Celsius
+cloud_coverage - Portion of the sky covered in clouds, in oktas
+dew_temperature - Degrees Celsius 
+precip_depth_1_hr - Millimeters 
+sea_level_pressure - Millibar/hectopascals 
+wind_direction - Compass direction (0-360) 
+wind_speed - Meters per second
+
+```{r}
+summary(weather_train)
+
+```
+
+In this data set there is some missing data that can be pretty relevant in terms of the prediction of the consumption.
+
+
+IMPUTATION
+
+To imputate the data for the air_temperature 2 methods will performed:
+- When a missing value is found pick the two colindant values (previous and later) and make the mean.
+- If the two values are missing, pick the value of the same hour but from the previous day an next day and mean
+
+```{r}
+imputation_table <- weather_train %>% 
+  group_by (site_id) %>%
+  mutate(previous_temp = lag(air_temperature, n=1), next_temp = lead(air_temperature, n=1),
+         last_day_same_hour_temp = lag(air_temperature, n=24), next_day_same_hour_temp = lead(air_temperature, n=24)) %>% select(site_id, air_temperature,previous_temp, next_temp, last_day_same_hour_temp, next_day_same_hour_temp)
+
+```
+
+```{r}
+imputation_table_mean <- imputation_table
+
+
+condition = is.na(imputation_table_mean$air_temperature)
+imputation_table_mean[condition,"air_temperature"] = rowMeans(imputation_table_mean[condition,c("previous_temp","next_temp")], na.rm= TRUE)
+
+condition = is.na(imputation_table_mean$air_temperature)
+imputation_table_mean[condition,"air_temperature"] = rowMeans(imputation_table_mean[condition,c("last_day_same_hour_temp","next_day_same_hour_temp")], na.rm= TRUE)
+condition = is.na(imputation_table_mean$air_temperature)
+sum(condition)
+
+```
+
+
+- Mice imputation:
+Amb les mateixes variables creades fem apliquem el MICE. Aquí explicaré el que fa el MICE
+
+
+
+```{r}
+library(mice)
+library(VIM)
+```
+The former implements a method to deal with missing data. The _mice_ package creates multiple imputations (replacement values) for multivariate missing data. The method is based on Fully Conditional Specification, where each incomplete variable is imputed by a separate model [1]. 
+
+On the other hand, _VIM_ package stands for "Visualization and Imputation of Missing Values", and it introduces new tools for exploring the data and the structure of the missing or imputed values [2].
+```{r}
+imputation_table_mice <- imputation_table
+
+imp <- mice(imputation_table_mice, seed = 7)
+
+data.imp <- complete(imp, 1)
+
+```
+
+Now let's study which of the two imputation methods is better:
+we will generate fake missing values and apply the two methodologies. Then compare using minimum square error as a metric, which method has a higher accuracy.
+7000 rows are selected which represent 5% of the total.
+
+
+```{r}
+#duplicate the table
+imputation_table_fake_na <- imputation_table
+#number of values to replace:
+N  <-  7000
+#seed so the selection of the sample will always be the same:
+set.seed(500)
+#Aleatory sample without replacement:
+ids <-sample(1:length(imputation_table_fake_na$air_temperature),N , replace = FALSE)
+#Subsitute the rows selected by NA
+imputation_table_fake_na[ids, "air_temperature"] <- NA 
+#total na values:
+sum(is.na(imputation_table_fake_na$air_temperature))
+
+```
+
+Now there are 7053 values, the 53 already existing plus the 7000 generated for testing the models.
+Let's start by using the mean methodology:
+
+```{r}
+imputation_table_fake_na_mean <- imputation_table_fake_na
+
+condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
+imputation_table_fake_na_mean[condition_is_fake_na,"air_temperature"] = rowMeans(imputation_table_fake_na_mean[condition_is_fake_na,c("previous_temp","next_temp")], na.rm= TRUE)
+
+condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
+imputation_table_mean[condition_is_fake_na,"air_temperature"] = rowMeans(imputation_table_fake_na_mean[condition_is_fake_na,c("last_day_same_hour_temp","next_day_same_hour_temp")], na.rm= TRUE)
+condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
+sum(condition_is_fake_na)
+
+```
+
+and now the imputation using mice:
+
+
+
+```{r}
+imputation_table_fake_na_mice <- imputation_table_fake_na
+
+imp <- mice(imputation_table_fake_na_mice, seed = 7)
+
+imputation_table_fake_na_mice <- complete(imp, 1)
+
+```
+
+mean square error between the real values and the imputated.
+
+```{r}
+
+mean((imputation_table[ids,]$air_temperature-imputation_table_fake_na_mean[ids,]$air_temperature)^2, na.rm = TRUE)
+
+```
+
+```{r}
+
+mean((imputation_table[ids,]$air_temperature-imputation_table_fake_na_mice[ids,]$air_temperature)^2, na.rm = TRUE)
+
+```
+
+0.38 // 19.18
