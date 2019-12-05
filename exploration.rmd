@@ -13,8 +13,6 @@ Some elementary questions are expected to be answered during this process:
 * Which new features can be relevant for the case?
 
 ###Setup the software
-https://www.kaggle.com/jaseziv83/a-deep-dive-eda-into-all-variables
-https://www.kaggle.com/etsc9287/a-thorough-eda-on-ashrae
 ggplot2 styles:
 https://www.datanovia.com/en/blog/the-a-z-of-rcolorbrewer-palette/#install-and-load-rcolorbrewer-package
 https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/#change-legend-title
