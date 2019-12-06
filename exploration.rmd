@@ -346,7 +346,6 @@ corrForMeter
 WEATHER TRAIN DATASET:
 ```{r}
 weather_train <- read_csv("data/weather_train.csv")
-View(weather_train)
 
 ```
              
@@ -374,118 +373,18 @@ summary(weather_train)
 In this data set there is some missing data that can be pretty relevant in terms of the prediction of the consumption.
 
 
-IMPUTATION
 
-To imputate the data for the air_temperature 2 methods will performed:
-- When a missing value is found pick the two colindant values (previous and later) and make the mean.
-- If the two values are missing, pick the value of the same hour but from the previous day an next day and mean
+########################
+JOIN ALL THE DATA IN ONE TRAINING SET.
+Let's merge the two datasets data_train and weather train:
 
 ```{r}
-imputation_table <- weather_train %>% 
-  group_by (site_id) %>%
-  mutate(previous_temp = lag(air_temperature, n=1), next_temp = lead(air_temperature, n=1),
-         last_day_same_hour_temp = lag(air_temperature, n=24), next_day_same_hour_temp = lead(air_temperature, n=24)) %>% select(site_id, air_temperature,previous_temp, next_temp, last_day_same_hour_temp, next_day_same_hour_temp)
-
+data_train <- merge(data_train, weather_train, by=c('site_id','timestamp'))
 ```
 
 ```{r}
-imputation_table_mean <- imputation_table
-
-
-condition = is.na(imputation_table_mean$air_temperature)
-imputation_table_mean[condition,"air_temperature"] = rowMeans(imputation_table_mean[condition,c("previous_temp","next_temp")], na.rm= TRUE)
-
-condition = is.na(imputation_table_mean$air_temperature)
-imputation_table_mean[condition,"air_temperature"] = rowMeans(imputation_table_mean[condition,c("last_day_same_hour_temp","next_day_same_hour_temp")], na.rm= TRUE)
-condition = is.na(imputation_table_mean$air_temperature)
-sum(condition)
-
+ write.csv(data_train, "data_train.csv")
 ```
 
 
-- Mice imputation:
-Amb les mateixes variables creades fem apliquem el MICE. Aquí explicaré el que fa el MICE
 
-
-
-```{r}
-library(mice)
-library(VIM)
-```
-The former implements a method to deal with missing data. The _mice_ package creates multiple imputations (replacement values) for multivariate missing data. The method is based on Fully Conditional Specification, where each incomplete variable is imputed by a separate model [1]. 
-
-On the other hand, _VIM_ package stands for "Visualization and Imputation of Missing Values", and it introduces new tools for exploring the data and the structure of the missing or imputed values [2].
-```{r}
-imputation_table_mice <- imputation_table
-
-imp <- mice(imputation_table_mice, seed = 7)
-
-data.imp <- complete(imp, 1)
-
-```
-
-Now let's study which of the two imputation methods is better:
-we will generate fake missing values and apply the two methodologies. Then compare using minimum square error as a metric, which method has a higher accuracy.
-7000 rows are selected which represent 5% of the total.
-
-
-```{r}
-#duplicate the table
-imputation_table_fake_na <- imputation_table
-#number of values to replace:
-N  <-  7000
-#seed so the selection of the sample will always be the same:
-set.seed(500)
-#Aleatory sample without replacement:
-ids <-sample(1:length(imputation_table_fake_na$air_temperature),N , replace = FALSE)
-#Subsitute the rows selected by NA
-imputation_table_fake_na[ids, "air_temperature"] <- NA 
-#total na values:
-sum(is.na(imputation_table_fake_na$air_temperature))
-
-```
-
-Now there are 7053 values, the 53 already existing plus the 7000 generated for testing the models.
-Let's start by using the mean methodology:
-
-```{r}
-imputation_table_fake_na_mean <- imputation_table_fake_na
-
-condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
-imputation_table_fake_na_mean[condition_is_fake_na,"air_temperature"] = rowMeans(imputation_table_fake_na_mean[condition_is_fake_na,c("previous_temp","next_temp")], na.rm= TRUE)
-
-condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
-imputation_table_mean[condition_is_fake_na,"air_temperature"] = rowMeans(imputation_table_fake_na_mean[condition_is_fake_na,c("last_day_same_hour_temp","next_day_same_hour_temp")], na.rm= TRUE)
-condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
-sum(condition_is_fake_na)
-
-```
-
-and now the imputation using mice:
-
-
-
-```{r}
-imputation_table_fake_na_mice <- imputation_table_fake_na
-
-imp <- mice(imputation_table_fake_na_mice, seed = 7)
-
-imputation_table_fake_na_mice <- complete(imp, 1)
-
-```
-
-mean square error between the real values and the imputated.
-
-```{r}
-
-mean((imputation_table[ids,]$air_temperature-imputation_table_fake_na_mean[ids,]$air_temperature)^2, na.rm = TRUE)
-
-```
-
-```{r}
-
-mean((imputation_table[ids,]$air_temperature-imputation_table_fake_na_mice[ids,]$air_temperature)^2, na.rm = TRUE)
-
-```
-
-0.38 // 19.18

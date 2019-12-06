@@ -1,0 +1,264 @@
+---
+title: "Imputation"
+author: "Anna Luis"
+date: "6 de diciembre de 2019"
+output: html_document
+---
+
+Now all the data join is in this file data_train:
+```{r}
+library(readr)
+data_train <- read_csv("data/data_train.csv")
+```
+
+```{r warning=FALSE, results="hide", message=FALSE} 
+#Set Libraries:
+library("readr")
+library("dplyr")
+library("lubridate")
+```
+
+Explicació sobre missing data. We have two options or do not use the variables containing it or imputate it.
+We will start the imputation of the missing data with the weather data:
+
+IMPUTATION
+
+```{r}
+library(readr)
+weather_train <- read_csv("data/weather_train.csv")
+
+```
+```{r}
+summary(is.na(weather_train))
+
+```
+
+
+There is quite a lot of missing data in this data set that can be relevant for the model.
+
+
+To imputate the data two methods will performed:
+
+First:
+Taking into acount that the variables in this dataset are time depending. We will apply this method to all the varibles with missing data
+1. When a missing value is found pick the two colindant values from the previous and later hour and make the mean.
+2. If the two values are missing, pick the value of the same hour but from the previous day and next day and make as well the mean.
+3. If the colindant days are also missing, pick the mean of the day, mean of the week and mean of the month.
+
+```{r}
+#let's create a table "imputation_table" with the new varibles for point 1 and 2 of this method.
+imputation_table <- weather_train 
+
+for(i in 3:9){
+  column_name= colnames(weather_train)[i]
+  col_previous= paste("previous",column_name, sep="_")
+  col_next=paste("next",column_name, sep="_")
+  col_last_day_same_hour=paste("last_day_same_hour",column_name, sep="_")
+  col_next_day_same_hour=paste("next_day_same_hour",column_name, sep="_")
+
+imputation_table<-imputation_table %>% group_by (site_id) %>% mutate(!!col_previous:=lag(!!as.name(column_name), n=1))
+imputation_table<-imputation_table %>% group_by (site_id) %>% mutate(!!col_next:=lead(!!as.name(column_name), n=1))
+imputation_table<-imputation_table %>% group_by (site_id) %>% mutate(!!col_last_day_same_hour:=lag(!!as.name(column_name), n=24))
+imputation_table<-imputation_table %>% group_by (site_id) %>% mutate(!!col_next_day_same_hour:=lead(!!as.name(column_name), n=24))
+ }
+```
+
+```{r}
+imputation_table_mean_first <- imputation_table
+
+for(i in 3:9 ){
+ column_name= colnames(weather_train)[i]
+ print(column_name)
+ col_previous= paste("previous",column_name, sep="_")
+ col_next=paste("next",column_name, sep="_")
+ col_last_day_same_hour=paste("last_day_same_hour",column_name, sep="_")
+ col_next_day_same_hour=paste("next_day_same_hour",column_name, sep="_")
+ condition = is.na(imputation_table_mean_first)
+
+ # first point of the model:
+imputation_table_mean_first[condition[,column_name],column_name] = rowMeans(imputation_table_mean_first[condition[,column_name],c(col_previous, col_next)], na.rm= TRUE)
+
+# recalibrate the condition for this variable:
+condition = is.na(imputation_table_mean_first[,column_name])
+
+# second point of the model:
+imputation_table_mean_first[condition[,column_name],column_name] = rowMeans(imputation_table_mean_first[condition[,column_name],c( col_last_day_same_hour, col_next_day_same_hour)], na.rm= TRUE)
+
+print(sum(is.na(imputation_table_mean_first[,column_name])))
+}
+```
+
+After applying steps 1 and 2 there is still 4 variables (cloud_coverage, precip_depth_1_hr, sea_level_pressure and wind_direction) that has missing values. 
+We will follow the logic and apply the 3rd step.
+
+
+```{r}
+#first create the variables:
+imputation_table_mean_complete <- imputation_table_mean_first
+imputation_table_mean_complete  <- imputation_table_mean_complete %>% mutate(timestamp_date = date(timestamp),
+                          timestamp_month = month(timestamp),
+                          timestamp_week = week(timestamp))
+
+
+for(i in 3:9 ){
+ column_name= colnames(weather_train)[i]
+ print(column_name)
+ col_mean_day= paste("mean_day",column_name, sep="_")
+ col_mean_week=paste("mean_week",column_name, sep="_")
+ col_mean_month=paste("mean_month",column_name, sep="_")
+ col_mean_site=paste("mean_site",column_name, sep="_")
+ col_mean_total=paste("mean_total",column_name, sep="_")
+ 
+condition = is.na(imputation_table_mean_first)
+
+day <- imputation_table_mean_complete %>%
+  group_by(site_id,timestamp_date) %>%
+  summarize(!!col_mean_day := mean(!!as.name(column_name), na.rm=TRUE))
+ 
+imputation_table_mean_complete <- merge(imputation_table_mean_complete, day, by=c('timestamp_date', 'site_id'))
+
+week <- imputation_table_mean_complete %>%
+  group_by(site_id,timestamp_week) %>%
+  summarize(!!col_mean_week := mean(!!as.name(column_name), na.rm=TRUE))
+
+imputation_table_mean_complete <- merge(imputation_table_mean_complete, week, by=c('timestamp_week', 'site_id'))
+
+month <- imputation_table_mean_complete %>%
+  group_by(site_id,timestamp_month) %>%
+  summarize(!!col_mean_month := mean(!!as.name(column_name), na.rm=TRUE))
+
+imputation_table_mean_complete <- merge(imputation_table_mean_complete, month, by=c('timestamp_month', 'site_id'))
+
+mean_site <- imputation_table_mean_complete %>%
+  group_by(site_id) %>%
+  summarize(!!col_mean_site := mean(!!as.name(column_name), na.rm=TRUE))
+
+imputation_table_mean_complete <- merge(imputation_table_mean_complete, mean_site, by=c('site_id'))
+
+#because there is still sites without any data of it, we will replaced by the mean of all the sites
+imputation_table_mean_complete <- imputation_table_mean_complete %>%
+ mutate(!!col_mean_total := mean(!!as.name(column_name), na.rm=TRUE))
+
+}
+
+```
+
+```{r}
+imputation_table_mean_final <- imputation_table_mean_complete
+
+for(i in 3:9 ){
+  column_name= colnames(weather_train)[i]
+ print(column_name)
+ 
+  for(j in 1:5){
+ 
+mean_list <- c(paste("mean_day",column_name, sep="_"),
+paste("mean_week",column_name, sep="_"),
+paste("mean_month",column_name, sep="_"),
+paste("mean_site",column_name, sep="_"),
+paste("mean_total",column_name, sep="_"))
+ 
+ 
+condition = is.na(imputation_table_mean_final)
+print(mean_list[j])
+print(sum(condition[,column_name]))
+
+if(sum(condition[,column_name])>0){
+  imputation_table_mean_final[condition[,column_name],column_name] = imputation_table_mean_final[condition[,column_name],mean_list[j]]}
+
+print(sum(is.na(imputation_table_mean_final[,column_name])))
+}}
+```
+
+```{r}
+library(mice)
+library(VIM)
+```
+The former implements a method to deal with missing data. The _mice_ package creates multiple imputations (replacement values) for multivariate missing data. The method is based on Fully Conditional Specification, where each incomplete variable is imputed by a separate model [1]. 
+
+On the other hand, _VIM_ package stands for "Visualization and Imputation of Missing Values", and it introduces new tools for exploring the data and the structure of the missing or imputed values [2].
+```{r}
+imputation_table_mice <- imputation_table
+
+imp <- mice(imputation_table_mice, seed = 7)
+
+data.imp <- complete(imp, 1)
+
+```
+
+Now let's study which of the two imputation methods is better:
+we will generate fake missing values and apply the two methodologies. Then compare using minimum square error as a metric, which method has a higher accuracy.
+7000 rows are selected which represent 5% of the total.
+
+
+```{r}
+#duplicate the table
+imputation_table_fake_na <- imputation_table
+#number of values to replace:
+N  <-  7000
+#seed so the selection of the sample will always be the same:
+set.seed(500)
+#Aleatory sample without replacement:
+ids <-sample(1:length(imputation_table_fake_na$air_temperature),N , replace = FALSE)
+#Subsitute the rows selected by NA
+imputation_table_fake_na[ids, "air_temperature"] <- NA 
+#total na values:
+sum(is.na(imputation_table_fake_na$air_temperature))
+
+```
+
+Now there are 7053 values, the 53 already existing plus the 7000 generated for testing the models.
+Let's start by using the mean methodology:
+
+```{r}
+imputation_table_fake_na_mean <- imputation_table_fake_na
+
+condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
+imputation_table_fake_na_mean[condition_is_fake_na,"air_temperature"] = rowMeans(imputation_table_fake_na_mean[condition_is_fake_na,c("previous_temp","next_temp")], na.rm= TRUE)
+
+condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
+imputation_table_mean[condition_is_fake_na,"air_temperature"] = rowMeans(imputation_table_fake_na_mean[condition_is_fake_na,c("last_day_same_hour_temp","next_day_same_hour_temp")], na.rm= TRUE)
+condition_is_fake_na = is.na(imputation_table_fake_na_mean$air_temperature)
+sum(condition_is_fake_na)
+
+```
+
+and now the imputation using mice:
+
+
+
+```{r}
+imputation_table_fake_na_mice <- imputation_table_fake_na
+
+imp <- mice(imputation_table_fake_na_mice, seed = 7)
+
+imputation_table_fake_na_mice <- complete(imp, 1)
+
+```
+
+mean square error between the real values and the imputated.
+
+```{r}
+
+mean((imputation_table[ids,]$air_temperature-imputation_table_fake_na_mean[ids,]$air_temperature)^2, na.rm = TRUE)
+
+```
+
+```{r}
+
+mean((imputation_table[ids,]$air_temperature-imputation_table_fake_na_mice[ids,]$air_temperature)^2, na.rm = TRUE)
+
+```
+
+0.38 // 19.18
+
+
+The best method seemed to be the mean, so we will use this imputation.
+
+For the rest of the variables we will apply in the weather data set that has nans
+
+```{r}
+
+mean((imputation_table[ids,]$air_temperature-imputation_table_fake_na_mice[ids,]$air_temperature)^2, na.rm = TRUE)
+
+```
