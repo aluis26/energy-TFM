@@ -129,15 +129,15 @@ $(document).ready(function () {
 
 
 <div id="missing-data" class="section level1">
-<h1>MISSING DATA</h1>
+<h1>Missing data</h1>
 <p>Explicació sobre missing data. We have two options or do not use the variables containing it or imputate it.</p>
 <pre class="r"><code>#Set Libraries:
 library(&quot;readr&quot;)
 library(&quot;dplyr&quot;)
 library(&quot;lubridate&quot;)
 library(&quot;tidyverse&quot;)</code></pre>
-<div id="weather_train-dataset" class="section level2">
-<h2>WEATHER_TRAIN DATASET</h2>
+<div id="weater_train-dataset" class="section level2">
+<h2>Weater_train dataset</h2>
 <p>We will start the imputation of the missing data with the weather data:</p>
 <pre class="r"><code>weather_train &lt;- read_csv(&quot;data/weather_train.csv&quot;)</code></pre>
 <pre class="r"><code>summary(is.na(weather_train))</code></pre>
@@ -457,34 +457,11 @@ imputation_table_fake_na_mice_red &lt;- imputation_table_fake_na_mice %&gt;% sel
 <pre class="r"><code>#rearrange the data set so the index coincide:
 imputation_table = arrange(imputation_table, site_id, timestamp)
 imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
-
-#Calulate the metric for each feature:
-for(i in 1:7){
-  column_name= list_var_to_impute[i]
- print(column_name)
- print(paste(&quot;mice:&quot;, mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE), sep= &quot; &quot;))}</code></pre>
-<pre><code>## [1] &quot;air_temperature&quot;
-## [1] &quot;mice: 0.0208207142857143&quot;
-## [1] &quot;cloud_coverage&quot;
-## [1] &quot;mice: 0.0654035874439462&quot;
-## [1] &quot;dew_temperature&quot;
-## [1] &quot;mice: 0.0174514146899114&quot;
-## [1] &quot;precip_depth_1_hr&quot;
-## [1] &quot;mice: 0.941576533015944&quot;
-## [1] &quot;sea_level_pressure&quot;
-## [1] &quot;mice: 0.00235192307692316&quot;
-## [1] &quot;wind_direction&quot;
-## [1] &quot;mice: 253.747011356844&quot;
-## [1] &quot;wind_speed&quot;
-## [1] &quot;mice: 1.26004938448325&quot;</code></pre>
-<pre class="r"><code>#rearrange the data set so the index coincide:
-imputation_table = arrange(imputation_table, site_id, timestamp)
-imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
 imputation_table_fake_na_mice_red = arrange(imputation_table_fake_na_mice_red, site_id, timestamp)
 
 #create a dataframe to save the results:
-results_imp &lt;- data.frame(matrix(NA, nrow = 7, ncol = 2))
-colnames(results_imp)&lt;- c(&quot;mean&quot;, &quot;mice&quot;)
+results_imp &lt;- data.frame(matrix(NA, nrow = 7, ncol = 3))
+colnames(results_imp)&lt;- c(&quot;mean&quot;, &quot;mice&quot;, &quot;mice/mean&quot;)
 rownames(results_imp)&lt;- c(list_var_to_impute)
 
 
@@ -494,8 +471,13 @@ for(i in 1:7){
  
  mean &lt;- round(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE), digits =3 )
  results_imp[column_name, &quot;mean&quot;] &lt;- mean
+ 
    mice &lt;- round(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mice_red[ids,column_name])^2)[,column_name], na.rm = TRUE), digits =3 )
   results_imp[column_name, &quot;mice&quot;] &lt;- mice
+  
+  mice_mean &lt;- (mice/mean)
+    results_imp[column_name, &quot;mice/mean&quot;] &lt;- mice_mean
+  
 }</code></pre>
 <pre class="r"><code>final_results &lt;-cbind(total_fake_na,results_imp)
 final_results</code></pre>
@@ -506,13 +488,15 @@ final_results</code></pre>
 ## precip_depth_1_hr       50289    54781          4492   0.942   6.030
 ## sea_level_pressure      10618    17094          6476   0.002   3.909
 ## wind_direction           6268    12953          6685 253.747 989.847
-## wind_speed                304     7290          6986   1.260   0.355</code></pre>
-<pre class="r"><code>total_mean_square_error_mean&lt;- sum(final_results[,&quot;total_fake_na&quot;]*final_results[,&quot;mean&quot;])/sum(final_results[,&quot;total_fake_na&quot;])
-total_mean_square_error_mean</code></pre>
-<pre><code>## [1] 40.5656</code></pre>
-<pre class="r"><code>total_mean_square_error_mice&lt;- sum(final_results[,&quot;total_fake_na&quot;]*final_results[,&quot;mice&quot;])/sum(final_results[,&quot;total_fake_na&quot;])
-total_mean_square_error_mice</code></pre>
-<pre><code>## [1] 158.8623</code></pre>
+## wind_speed                304     7290          6986   1.260   0.355
+##                      mice/mean
+## air_temperature      85.380952
+## cloud_coverage        5.061538
+## dew_temperature      86.882353
+## precip_depth_1_hr     6.401274
+## sea_level_pressure 1954.500000
+## wind_direction        3.900921
+## wind_speed            0.281746</code></pre>
 </div>
 </div>
 

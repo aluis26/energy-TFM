@@ -4,7 +4,7 @@ author: "Anna Luis"
 date: "6 de diciembre de 2019"
 output: html_document
 ---
-#MISSING DATA
+#Missing data
 Explicació sobre missing data. We have two options or do not use the variables containing it or imputate it.
 
 ```{r warning=FALSE, results="hide", message=FALSE} 
@@ -15,7 +15,7 @@ library("lubridate")
 library("tidyverse")
 ```
 
-##WEATHER_TRAIN DATASET
+##Weater_train dataset
 We will start the imputation of the missing data with the weather data:
 ```{r message=FALSE}
 weather_train <- read_csv("data/weather_train.csv")
@@ -324,25 +324,11 @@ imputation_table_fake_na_mice_red <- read_csv("data/data_wheater_imputated.csv")
 #rearrange the data set so the index coincide:
 imputation_table = arrange(imputation_table, site_id, timestamp)
 imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
-
-#Calulate the metric for each feature:
-for(i in 1:7){
-  column_name= list_var_to_impute[i]
- print(column_name)
- print(paste("mice:", mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE), sep= " "))}
-
-
-```
-
-```{r}
-#rearrange the data set so the index coincide:
-imputation_table = arrange(imputation_table, site_id, timestamp)
-imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
 imputation_table_fake_na_mice_red = arrange(imputation_table_fake_na_mice_red, site_id, timestamp)
 
 #create a dataframe to save the results:
-results_imp <- data.frame(matrix(NA, nrow = 7, ncol = 2))
-colnames(results_imp)<- c("mean", "mice")
+results_imp <- data.frame(matrix(NA, nrow = 7, ncol = 3))
+colnames(results_imp)<- c("mean", "mice", "mice/mean")
 rownames(results_imp)<- c(list_var_to_impute)
 
 
@@ -352,8 +338,13 @@ for(i in 1:7){
  
  mean <- round(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE), digits =3 )
  results_imp[column_name, "mean"] <- mean
+ 
    mice <- round(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mice_red[ids,column_name])^2)[,column_name], na.rm = TRUE), digits =3 )
   results_imp[column_name, "mice"] <- mice
+  
+  mice_mean <- (mice/mean)
+    results_imp[column_name, "mice/mean"] <- mice_mean
+  
 }
 
 ```
@@ -365,14 +356,6 @@ final_results <-cbind(total_fake_na,results_imp)
 final_results
 ```
 
-```{r}
-total_mean_square_error_mean<- sum(final_results[,"total_fake_na"]*final_results[,"mean"])/sum(final_results[,"total_fake_na"])
-total_mean_square_error_mean
-```
-```{r}
-total_mean_square_error_mice<- sum(final_results[,"total_fake_na"]*final_results[,"mice"])/sum(final_results[,"total_fake_na"])
-total_mean_square_error_mice
-```
 
 
 
