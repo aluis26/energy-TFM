@@ -144,10 +144,15 @@ Let's create some functions that apply the imputation steps before settled up.
 ```{r}
 #first_steps function:
 first_steps <- function(table){
+
+#create a dataframe to save the results:
+results_first_steps <- data.frame(matrix(NA, nrow = 7, ncol = 2))
+colnames(results_first_steps)<- c("initial_num_of_NA", "final_num_of_NA")
+rownames(results_first_steps)<- c(list_var_to_impute)
+
   
 for(i in 1:7){
   column_name= list_var_to_impute[i]
-   print(column_name)
    
    #columns to use in the imputation: 
    col_previous= paste("previous_hour",column_name, sep="_")
@@ -157,7 +162,8 @@ for(i in 1:7){
    
    # Set a variable condition as matrix with the same size of the imputation_table_mean_first(with all the variables) containing TRUES when a missing value is found, and FALSE when not.
    condition = is.na(table[,column_name])
-    print(paste("initial number of missing values:", sum(condition), sep=" "))
+   
+   results_first_steps[column_name,"initial_num_of_NA"] <- sum(condition)
     
    # 1 step, use the mean of the previous and next hour to replace the missing value:
   table[condition ,column_name] = rowMeans(table[condition,c(col_previous, col_next)], na.rm= TRUE)
@@ -168,10 +174,10 @@ for(i in 1:7){
   # 2 step, use the mean of the same hour from next and previous days to replace the missing value:
   table[condition,column_name] = rowMeans(table[condition,c( col_last_day_same_hour, col_next_day_same_hour)], na.rm= TRUE)
   
-  print(paste("final number of missing values:", sum(is.na(table[,column_name])),sep=" "))
-  
-  }
-  return(table)
+  results_first_steps[column_name,"final_num_of_NA"] <- sum(condition)
+
+}
+  return(list("table_first"=table,"results_first_steps"= results_first_steps))
 }
 
 ```
@@ -183,9 +189,13 @@ for(i in 1:7){
 ```{r}
 #function third_step:
 third_step <- function(table){
+  
+  #create a dataframe to save the results:
+results_third_step <- data.frame(matrix(ncol = 2))
+colnames(results_third_step)<- c("initial_num_of_NA", "final_num_of_NA")
+
 for(i in 1:7){
   column_name= list_var_to_impute[i]
- print(column_name)
  
   for(j in 1:5){
   #columns to use in the imputation  
@@ -198,19 +208,21 @@ paste("mean_total",column_name, sep="_"))
 # Set a variable condition as matrix with the same size of the table(with all the variables) containing TRUES when a missing value is found, and FALSE when not. 
 condition = is.na(table)
 
-print(mean_list[j])
-print(paste("initial number of missing values:", sum(condition[,column_name]), sep=" "))
-
+results_third_step[mean_list[j],"initial_num_of_NA"] <- sum(condition[,column_name])
 
 # if there is still missing values in one variable subsitute them first with the mean of the day, mean of the week, mean of the month, mean of the site and finally with the general mean:
 if(sum(condition[,column_name])>0){
   table[condition[,column_name],column_name] = table[condition[,column_name],mean_list[j]]
-  print(paste("final number of missing values:", sum(is.na(table[,column_name])), sep=" "))
-  }
+
+}
+  condition = is.na(table)
+ results_third_step[mean_list[j],"final_num_of_NA"] <- sum(condition[,column_name])
+
 
   }}
-  return(table)
-  }
+  return(list("table_third"=table,"results_third_step"=results_third_step ))
+}
+
 
 ```
 
@@ -245,10 +257,13 @@ counter = 100
 # Arrenge the dataset by site id and timestamp:
 imputation_table_fake_na = arrange(imputation_table_fake_na, site_id, timestamp)
 
+total_fake_na <- data.frame(matrix(NA, nrow=7, ncol= 3))
+rownames(total_fake_na)<- c(list_var_to_impute)
+colnames(total_fake_na)<- c("initial_na","final_na","total_fake_na")
+
 
 for(k in 6:12 ){
-  print(colnames(imputation_table_fake_na)[k])
-  print(paste("initial number of missing data", sum(is.na(imputation_table_fake_na[,k])), sep=" "))
+  initial_na<-sum(is.na(imputation_table_fake_na[,k]))
   #seed so the selection of the sample will always be the same for each variable:
   set.seed(counter)
   counter <- counter + 1
@@ -257,9 +272,15 @@ for(k in 6:12 ){
   #Subsitute the rows selected by NA
   imputation_table_fake_na[ids, k] <- NA 
   #total na values:
-  print(paste("final number of missing data", sum(is.na(imputation_table_fake_na[,k])), sep= " "))
+  final_na <- sum(is.na(imputation_table_fake_na[,k]))
+  
+  total_fake_na[colnames(imputation_table_fake_na)[k],"initial_na"] <- initial_na
+  total_fake_na[colnames(imputation_table_fake_na)[k],"final_na"] <- final_na
+  total_fake_na[colnames(imputation_table_fake_na)[k],"total_fake_na"] <- final_na-initial_na
 
 }
+
+total_fake_na
 ```
 
 Randomly we had selected 7000 rows and replaced the data by NA's. As in some cases there is already a lot of NA the probability to pick on of them is high and consequently the total of missing values does not correspont to the sum of 7000 plus the previous amount.
@@ -268,27 +289,20 @@ Once generated the table with the fake NA's let's use the first model to imputat
 
 ```{r}
 imputation_table_fake_na_mean <- imputation_table_fake_na
-imputation_table_fake_na_mean <- first_steps(imputation_table_fake_na_mean)
-imputation_table_fake_na_mean <- third_step(imputation_table_fake_na_mean)
-```
-Let's discover how good is this imputation by calculating the minimum square error.
-```{r}
-#rearrange the data set so the index coincide:
-imputation_table = arrange(imputation_table, site_id, timestamp)
-imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
+res_first <- first_steps(imputation_table_fake_na_mean)
+imputation_table_fake_na_mean <-res_first$table 
+res_first$results_first_steps
 
-#Calulate the metric for each feature:
-for(i in 3:9 ){
-  column_name= colnames(weather_train)[i]
- print(column_name)
- print(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE))}
-
+res_third <- third_step(imputation_table_fake_na_mean)
+imputation_table_fake_na_mean <- res_third$table_third
+res_third$results_third_step[-c(1),]
 
 ```
+
 
 And now the imputation using mice:
 
-```{r eval=FALSE, warning=FALSE}
+```{r eval=FALSE, warning=FALSE, message=FALSE}
 
 imputation_table_fake_na_mice <- imputation_table_fake_na
 
@@ -306,21 +320,60 @@ imputation_table_fake_na_mice_red <- read_csv("data/data_wheater_imputated.csv")
 
 ```
 
-square error between the real values and the imputated.
 ```{r}
 #rearrange the data set so the index coincide:
 imputation_table = arrange(imputation_table, site_id, timestamp)
-imputation_table_fake_na_mice_red = arrange(imputation_table_fake_na_mice_red, site_id, timestamp)
+imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
+
 #Calulate the metric for each feature:
-for(i in 3:9 ){
-  column_name= colnames(weather_train)[i]
+for(i in 1:7){
+  column_name= list_var_to_impute[i]
  print(column_name)
- print(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mice_red[ids,column_name])^2)[,column_name], na.rm = TRUE))}
+ print(paste("mice:", mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE), sep= " "))}
 
 
 ```
 
-The best method seemed to be the mean, so we will use this imputation.
+```{r}
+#rearrange the data set so the index coincide:
+imputation_table = arrange(imputation_table, site_id, timestamp)
+imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
+imputation_table_fake_na_mice_red = arrange(imputation_table_fake_na_mice_red, site_id, timestamp)
+
+#create a dataframe to save the results:
+results_imp <- data.frame(matrix(NA, nrow = 7, ncol = 2))
+colnames(results_imp)<- c("mean", "mice")
+rownames(results_imp)<- c(list_var_to_impute)
+
+
+#Calulate the metric for each feature for both methods:
+for(i in 1:7){
+  column_name= list_var_to_impute[i]
+ 
+ mean <- round(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE), digits =3 )
+ results_imp[column_name, "mean"] <- mean
+   mice <- round(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mice_red[ids,column_name])^2)[,column_name], na.rm = TRUE), digits =3 )
+  results_imp[column_name, "mice"] <- mice
+}
+
+```
+
+
+
+```{r}
+final_results <-cbind(total_fake_na,results_imp)
+final_results
+```
+
+```{r}
+total_mean_square_error_mean<- sum(final_results[,"total_fake_na"]*final_results[,"mean"])/sum(final_results[,"total_fake_na"])
+total_mean_square_error_mean
+```
+```{r}
+total_mean_square_error_mice<- sum(final_results[,"total_fake_na"]*final_results[,"mice"])/sum(final_results[,"total_fake_na"])
+total_mean_square_error_mice
+```
+
 
 
 

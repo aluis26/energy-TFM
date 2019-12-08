@@ -259,10 +259,15 @@ imputation_table_all_variables &lt;- imputation_table_all_variables %&gt;%
 </ol>
 <pre class="r"><code>#first_steps function:
 first_steps &lt;- function(table){
+
+#create a dataframe to save the results:
+results_first_steps &lt;- data.frame(matrix(NA, nrow = 7, ncol = 2))
+colnames(results_first_steps)&lt;- c(&quot;initial_num_of_NA&quot;, &quot;final_num_of_NA&quot;)
+rownames(results_first_steps)&lt;- c(list_var_to_impute)
+
   
 for(i in 1:7){
   column_name= list_var_to_impute[i]
-   print(column_name)
    
    #columns to use in the imputation: 
    col_previous= paste(&quot;previous_hour&quot;,column_name, sep=&quot;_&quot;)
@@ -272,7 +277,8 @@ for(i in 1:7){
    
    # Set a variable condition as matrix with the same size of the imputation_table_mean_first(with all the variables) containing TRUES when a missing value is found, and FALSE when not.
    condition = is.na(table[,column_name])
-    print(paste(&quot;initial number of missing values:&quot;, sum(condition), sep=&quot; &quot;))
+   
+   results_first_steps[column_name,&quot;initial_num_of_NA&quot;] &lt;- sum(condition)
     
    # 1 step, use the mean of the previous and next hour to replace the missing value:
   table[condition ,column_name] = rowMeans(table[condition,c(col_previous, col_next)], na.rm= TRUE)
@@ -283,10 +289,10 @@ for(i in 1:7){
   # 2 step, use the mean of the same hour from next and previous days to replace the missing value:
   table[condition,column_name] = rowMeans(table[condition,c( col_last_day_same_hour, col_next_day_same_hour)], na.rm= TRUE)
   
-  print(paste(&quot;final number of missing values:&quot;, sum(is.na(table[,column_name])),sep=&quot; &quot;))
-  
-  }
-  return(table)
+  results_first_steps[column_name,&quot;final_num_of_NA&quot;] &lt;- sum(condition)
+
+}
+  return(list(&quot;table_first&quot;=table,&quot;results_first_steps&quot;= results_first_steps))
 }</code></pre>
 <ul>
 <li>Step 3:</li>
@@ -296,9 +302,13 @@ for(i in 1:7){
 </ol>
 <pre class="r"><code>#function third_step:
 third_step &lt;- function(table){
+  
+  #create a dataframe to save the results:
+results_third_step &lt;- data.frame(matrix(ncol = 2))
+colnames(results_third_step)&lt;- c(&quot;initial_num_of_NA&quot;, &quot;final_num_of_NA&quot;)
+
 for(i in 1:7){
   column_name= list_var_to_impute[i]
- print(column_name)
  
   for(j in 1:5){
   #columns to use in the imputation  
@@ -311,19 +321,20 @@ paste(&quot;mean_total&quot;,column_name, sep=&quot;_&quot;))
 # Set a variable condition as matrix with the same size of the table(with all the variables) containing TRUES when a missing value is found, and FALSE when not. 
 condition = is.na(table)
 
-print(mean_list[j])
-print(paste(&quot;initial number of missing values:&quot;, sum(condition[,column_name]), sep=&quot; &quot;))
-
+results_third_step[mean_list[j],&quot;initial_num_of_NA&quot;] &lt;- sum(condition[,column_name])
 
 # if there is still missing values in one variable subsitute them first with the mean of the day, mean of the week, mean of the month, mean of the site and finally with the general mean:
 if(sum(condition[,column_name])&gt;0){
   table[condition[,column_name],column_name] = table[condition[,column_name],mean_list[j]]
-  print(paste(&quot;final number of missing values:&quot;, sum(is.na(table[,column_name])), sep=&quot; &quot;))
-  }
+
+}
+  condition = is.na(table)
+ results_third_step[mean_list[j],&quot;final_num_of_NA&quot;] &lt;- sum(condition[,column_name])
+
 
   }}
-  return(table)
-  }</code></pre>
+  return(list(&quot;table_third&quot;=table,&quot;results_third_step&quot;=results_third_step ))
+}</code></pre>
 </div>
 </div>
 </div>
@@ -349,10 +360,13 @@ counter = 100
 # Arrenge the dataset by site id and timestamp:
 imputation_table_fake_na = arrange(imputation_table_fake_na, site_id, timestamp)
 
+total_fake_na &lt;- data.frame(matrix(NA, nrow=7, ncol= 3))
+rownames(total_fake_na)&lt;- c(list_var_to_impute)
+colnames(total_fake_na)&lt;- c(&quot;initial_na&quot;,&quot;final_na&quot;,&quot;total_fake_na&quot;)
+
 
 for(k in 6:12 ){
-  print(colnames(imputation_table_fake_na)[k])
-  print(paste(&quot;initial number of missing data&quot;, sum(is.na(imputation_table_fake_na[,k])), sep=&quot; &quot;))
+  initial_na&lt;-sum(is.na(imputation_table_fake_na[,k]))
   #seed so the selection of the sample will always be the same for each variable:
   set.seed(counter)
   counter &lt;- counter + 1
@@ -361,173 +375,76 @@ for(k in 6:12 ){
   #Subsitute the rows selected by NA
   imputation_table_fake_na[ids, k] &lt;- NA 
   #total na values:
-  print(paste(&quot;final number of missing data&quot;, sum(is.na(imputation_table_fake_na[,k])), sep= &quot; &quot;))
+  final_na &lt;- sum(is.na(imputation_table_fake_na[,k]))
+  
+  total_fake_na[colnames(imputation_table_fake_na)[k],&quot;initial_na&quot;] &lt;- initial_na
+  total_fake_na[colnames(imputation_table_fake_na)[k],&quot;final_na&quot;] &lt;- final_na
+  total_fake_na[colnames(imputation_table_fake_na)[k],&quot;total_fake_na&quot;] &lt;- final_na-initial_na
 
-}</code></pre>
-<pre><code>## [1] &quot;air_temperature&quot;
-## [1] &quot;initial number of missing data 55&quot;
-## [1] &quot;final number of missing data 7054&quot;
-## [1] &quot;cloud_coverage&quot;
-## [1] &quot;initial number of missing data 69173&quot;
-## [1] &quot;final number of missing data 72689&quot;
-## [1] &quot;dew_temperature&quot;
-## [1] &quot;initial number of missing data 113&quot;
-## [1] &quot;final number of missing data 7109&quot;
-## [1] &quot;precip_depth_1_hr&quot;
-## [1] &quot;initial number of missing data 50289&quot;
-## [1] &quot;final number of missing data 54781&quot;
-## [1] &quot;sea_level_pressure&quot;
-## [1] &quot;initial number of missing data 10618&quot;
-## [1] &quot;final number of missing data 17094&quot;
-## [1] &quot;wind_direction&quot;
-## [1] &quot;initial number of missing data 6268&quot;
-## [1] &quot;final number of missing data 12953&quot;
-## [1] &quot;wind_speed&quot;
-## [1] &quot;initial number of missing data 304&quot;
-## [1] &quot;final number of missing data 7290&quot;</code></pre>
+}
+
+total_fake_na</code></pre>
+<pre><code>##                    initial_na final_na total_fake_na
+## air_temperature            55     7054          6999
+## cloud_coverage          69173    72689          3516
+## dew_temperature           113     7109          6996
+## precip_depth_1_hr       50289    54781          4492
+## sea_level_pressure      10618    17094          6476
+## wind_direction           6268    12953          6685
+## wind_speed                304     7290          6986</code></pre>
 <p>Randomly we had selected 7000 rows and replaced the data by NA’s. As in some cases there is already a lot of NA the probability to pick on of them is high and consequently the total of missing values does not correspont to the sum of 7000 plus the previous amount.</p>
 <p>Once generated the table with the fake NA’s let’s use the first model to imputate it:</p>
 <pre class="r"><code>imputation_table_fake_na_mean &lt;- imputation_table_fake_na
-imputation_table_fake_na_mean &lt;- first_steps(imputation_table_fake_na_mean)</code></pre>
-<pre><code>## [1] &quot;air_temperature&quot;
-## [1] &quot;initial number of missing values: 7054&quot;
-## [1] &quot;final number of missing values: 0&quot;
-## [1] &quot;cloud_coverage&quot;
-## [1] &quot;initial number of missing values: 72689&quot;
-## [1] &quot;final number of missing values: 33631&quot;
-## [1] &quot;dew_temperature&quot;
-## [1] &quot;initial number of missing values: 7109&quot;
-## [1] &quot;final number of missing values: 0&quot;
-## [1] &quot;precip_depth_1_hr&quot;
-## [1] &quot;initial number of missing values: 54781&quot;
-## [1] &quot;final number of missing values: 44029&quot;
-## [1] &quot;sea_level_pressure&quot;
-## [1] &quot;initial number of missing values: 17094&quot;
-## [1] &quot;final number of missing values: 8854&quot;
-## [1] &quot;wind_direction&quot;
-## [1] &quot;initial number of missing values: 12953&quot;
-## [1] &quot;final number of missing values: 130&quot;
-## [1] &quot;wind_speed&quot;
-## [1] &quot;initial number of missing values: 7290&quot;
-## [1] &quot;final number of missing values: 0&quot;</code></pre>
-<pre class="r"><code>imputation_table_fake_na_mean &lt;- third_step(imputation_table_fake_na_mean)</code></pre>
-<pre><code>## [1] &quot;air_temperature&quot;
-## [1] &quot;mean_day_air_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_week_air_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_month_air_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_site_air_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_total_air_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;cloud_coverage&quot;
-## [1] &quot;mean_day_cloud_coverage&quot;
-## [1] &quot;initial number of missing values: 33631&quot;
-## [1] &quot;final number of missing values: 22832&quot;
-## [1] &quot;mean_week_cloud_coverage&quot;
-## [1] &quot;initial number of missing values: 22832&quot;
-## [1] &quot;final number of missing values: 17384&quot;
-## [1] &quot;mean_month_cloud_coverage&quot;
-## [1] &quot;initial number of missing values: 17384&quot;
-## [1] &quot;final number of missing values: 17228&quot;
-## [1] &quot;mean_site_cloud_coverage&quot;
-## [1] &quot;initial number of missing values: 17228&quot;
-## [1] &quot;final number of missing values: 17228&quot;
-## [1] &quot;mean_total_cloud_coverage&quot;
-## [1] &quot;initial number of missing values: 17228&quot;
-## [1] &quot;final number of missing values: 0&quot;
-## [1] &quot;dew_temperature&quot;
-## [1] &quot;mean_day_dew_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_week_dew_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_month_dew_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_site_dew_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_total_dew_temperature&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;precip_depth_1_hr&quot;
-## [1] &quot;mean_day_precip_depth_1_hr&quot;
-## [1] &quot;initial number of missing values: 44029&quot;
-## [1] &quot;final number of missing values: 38518&quot;
-## [1] &quot;mean_week_precip_depth_1_hr&quot;
-## [1] &quot;initial number of missing values: 38518&quot;
-## [1] &quot;final number of missing values: 27706&quot;
-## [1] &quot;mean_month_precip_depth_1_hr&quot;
-## [1] &quot;initial number of missing values: 27706&quot;
-## [1] &quot;final number of missing values: 26273&quot;
-## [1] &quot;mean_site_precip_depth_1_hr&quot;
-## [1] &quot;initial number of missing values: 26273&quot;
-## [1] &quot;final number of missing values: 26273&quot;
-## [1] &quot;mean_total_precip_depth_1_hr&quot;
-## [1] &quot;initial number of missing values: 26273&quot;
-## [1] &quot;final number of missing values: 0&quot;
-## [1] &quot;sea_level_pressure&quot;
-## [1] &quot;mean_day_sea_level_pressure&quot;
-## [1] &quot;initial number of missing values: 8854&quot;
-## [1] &quot;final number of missing values: 8851&quot;
-## [1] &quot;mean_week_sea_level_pressure&quot;
-## [1] &quot;initial number of missing values: 8851&quot;
-## [1] &quot;final number of missing values: 8851&quot;
-## [1] &quot;mean_month_sea_level_pressure&quot;
-## [1] &quot;initial number of missing values: 8851&quot;
-## [1] &quot;final number of missing values: 8755&quot;
-## [1] &quot;mean_site_sea_level_pressure&quot;
-## [1] &quot;initial number of missing values: 8755&quot;
-## [1] &quot;final number of missing values: 8755&quot;
-## [1] &quot;mean_total_sea_level_pressure&quot;
-## [1] &quot;initial number of missing values: 8755&quot;
-## [1] &quot;final number of missing values: 0&quot;
-## [1] &quot;wind_direction&quot;
-## [1] &quot;mean_day_wind_direction&quot;
-## [1] &quot;initial number of missing values: 130&quot;
-## [1] &quot;final number of missing values: 0&quot;
-## [1] &quot;mean_week_wind_direction&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_month_wind_direction&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_site_wind_direction&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_total_wind_direction&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;wind_speed&quot;
-## [1] &quot;mean_day_wind_speed&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_week_wind_speed&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_month_wind_speed&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_site_wind_speed&quot;
-## [1] &quot;initial number of missing values: 0&quot;
-## [1] &quot;mean_total_wind_speed&quot;
-## [1] &quot;initial number of missing values: 0&quot;</code></pre>
-<p>Let’s discover how good is this imputation by calculating the minimum square error.</p>
-<pre class="r"><code>#rearrange the data set so the index coincide:
-imputation_table = arrange(imputation_table, site_id, timestamp)
-imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
-
-#Calulate the metric for each feature:
-for(i in 3:9 ){
-  column_name= colnames(weather_train)[i]
- print(column_name)
- print(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE))}</code></pre>
-<pre><code>## [1] &quot;air_temperature&quot;
-## [1] 0.02082071
-## [1] &quot;cloud_coverage&quot;
-## [1] 0.06540359
-## [1] &quot;dew_temperature&quot;
-## [1] 0.01745141
-## [1] &quot;precip_depth_1_hr&quot;
-## [1] 0.9415765
-## [1] &quot;sea_level_pressure&quot;
-## [1] 0.002351923
-## [1] &quot;wind_direction&quot;
-## [1] 253.747
-## [1] &quot;wind_speed&quot;
-## [1] 1.260049</code></pre>
+res_first &lt;- first_steps(imputation_table_fake_na_mean)
+imputation_table_fake_na_mean &lt;-res_first$table 
+res_first$results_first_steps</code></pre>
+<pre><code>##                    initial_num_of_NA final_num_of_NA
+## air_temperature                 7054              21
+## cloud_coverage                 72689           51919
+## dew_temperature                 7109              24
+## precip_depth_1_hr              54781           48593
+## sea_level_pressure             17094            9280
+## wind_direction                 12953             867
+## wind_speed                      7290              20</code></pre>
+<pre class="r"><code>res_third &lt;- third_step(imputation_table_fake_na_mean)
+imputation_table_fake_na_mean &lt;- res_third$table_third
+res_third$results_third_step[-c(1),]</code></pre>
+<pre><code>##                               initial_num_of_NA final_num_of_NA
+## mean_day_air_temperature                      0               0
+## mean_week_air_temperature                     0               0
+## mean_month_air_temperature                    0               0
+## mean_site_air_temperature                     0               0
+## mean_total_air_temperature                    0               0
+## mean_day_cloud_coverage                   33631           22832
+## mean_week_cloud_coverage                  22832           17384
+## mean_month_cloud_coverage                 17384           17228
+## mean_site_cloud_coverage                  17228           17228
+## mean_total_cloud_coverage                 17228               0
+## mean_day_dew_temperature                      0               0
+## mean_week_dew_temperature                     0               0
+## mean_month_dew_temperature                    0               0
+## mean_site_dew_temperature                     0               0
+## mean_total_dew_temperature                    0               0
+## mean_day_precip_depth_1_hr                44029           38518
+## mean_week_precip_depth_1_hr               38518           27706
+## mean_month_precip_depth_1_hr              27706           26273
+## mean_site_precip_depth_1_hr               26273           26273
+## mean_total_precip_depth_1_hr              26273               0
+## mean_day_sea_level_pressure                8854            8851
+## mean_week_sea_level_pressure               8851            8851
+## mean_month_sea_level_pressure              8851            8755
+## mean_site_sea_level_pressure               8755            8755
+## mean_total_sea_level_pressure              8755               0
+## mean_day_wind_direction                     130               0
+## mean_week_wind_direction                      0               0
+## mean_month_wind_direction                     0               0
+## mean_site_wind_direction                      0               0
+## mean_total_wind_direction                     0               0
+## mean_day_wind_speed                           0               0
+## mean_week_wind_speed                          0               0
+## mean_month_wind_speed                         0               0
+## mean_site_wind_speed                          0               0
+## mean_total_wind_speed                         0               0</code></pre>
 <p>And now the imputation using mice:</p>
 <pre class="r"><code>imputation_table_fake_na_mice &lt;- imputation_table_fake_na
 
@@ -537,30 +454,65 @@ imputation_table_fake_na_mice &lt;- complete(imp, 1)
 
 imputation_table_fake_na_mice_red &lt;- imputation_table_fake_na_mice %&gt;% select(site_id, timestamp, air_temperature, cloud_coverage, dew_temperature, precip_depth_1_hr, sea_level_pressure, wind_direction, wind_speed)</code></pre>
 <pre><code>## Warning: Missing column names filled in: 'X1' [1]</code></pre>
-<p>square error between the real values and the imputated.</p>
 <pre class="r"><code>#rearrange the data set so the index coincide:
 imputation_table = arrange(imputation_table, site_id, timestamp)
-imputation_table_fake_na_mice_red = arrange(imputation_table_fake_na_mice_red, site_id, timestamp)
+imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
+
 #Calulate the metric for each feature:
-for(i in 3:9 ){
-  column_name= colnames(weather_train)[i]
+for(i in 1:7){
+  column_name= list_var_to_impute[i]
  print(column_name)
- print(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mice_red[ids,column_name])^2)[,column_name], na.rm = TRUE))}</code></pre>
+ print(paste(&quot;mice:&quot;, mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE), sep= &quot; &quot;))}</code></pre>
 <pre><code>## [1] &quot;air_temperature&quot;
-## [1] 1.792797
+## [1] &quot;mice: 0.0208207142857143&quot;
 ## [1] &quot;cloud_coverage&quot;
-## [1] 0.3287556
+## [1] &quot;mice: 0.0654035874439462&quot;
 ## [1] &quot;dew_temperature&quot;
-## [1] 1.476748
+## [1] &quot;mice: 0.0174514146899114&quot;
 ## [1] &quot;precip_depth_1_hr&quot;
-## [1] 6.029681
+## [1] &quot;mice: 0.941576533015944&quot;
 ## [1] &quot;sea_level_pressure&quot;
-## [1] 3.909182
+## [1] &quot;mice: 0.00235192307692316&quot;
 ## [1] &quot;wind_direction&quot;
-## [1] 989.847
+## [1] &quot;mice: 253.747011356844&quot;
 ## [1] &quot;wind_speed&quot;
-## [1] 0.3549857</code></pre>
-<p>The best method seemed to be the mean, so we will use this imputation.</p>
+## [1] &quot;mice: 1.26004938448325&quot;</code></pre>
+<pre class="r"><code>#rearrange the data set so the index coincide:
+imputation_table = arrange(imputation_table, site_id, timestamp)
+imputation_table_fake_na_mean = arrange(imputation_table_fake_na_mean, site_id, timestamp)
+imputation_table_fake_na_mice_red = arrange(imputation_table_fake_na_mice_red, site_id, timestamp)
+
+#create a dataframe to save the results:
+results_imp &lt;- data.frame(matrix(NA, nrow = 7, ncol = 2))
+colnames(results_imp)&lt;- c(&quot;mean&quot;, &quot;mice&quot;)
+rownames(results_imp)&lt;- c(list_var_to_impute)
+
+
+#Calulate the metric for each feature for both methods:
+for(i in 1:7){
+  column_name= list_var_to_impute[i]
+ 
+ mean &lt;- round(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mean[ids,column_name])^2)[,column_name], na.rm = TRUE), digits =3 )
+ results_imp[column_name, &quot;mean&quot;] &lt;- mean
+   mice &lt;- round(mean(((imputation_table[ids,column_name]-imputation_table_fake_na_mice_red[ids,column_name])^2)[,column_name], na.rm = TRUE), digits =3 )
+  results_imp[column_name, &quot;mice&quot;] &lt;- mice
+}</code></pre>
+<pre class="r"><code>final_results &lt;-cbind(total_fake_na,results_imp)
+final_results</code></pre>
+<pre><code>##                    initial_na final_na total_fake_na    mean    mice
+## air_temperature            55     7054          6999   0.021   1.793
+## cloud_coverage          69173    72689          3516   0.065   0.329
+## dew_temperature           113     7109          6996   0.017   1.477
+## precip_depth_1_hr       50289    54781          4492   0.942   6.030
+## sea_level_pressure      10618    17094          6476   0.002   3.909
+## wind_direction           6268    12953          6685 253.747 989.847
+## wind_speed                304     7290          6986   1.260   0.355</code></pre>
+<pre class="r"><code>total_mean_square_error_mean&lt;- sum(final_results[,&quot;total_fake_na&quot;]*final_results[,&quot;mean&quot;])/sum(final_results[,&quot;total_fake_na&quot;])
+total_mean_square_error_mean</code></pre>
+<pre><code>## [1] 40.5656</code></pre>
+<pre class="r"><code>total_mean_square_error_mice&lt;- sum(final_results[,&quot;total_fake_na&quot;]*final_results[,&quot;mice&quot;])/sum(final_results[,&quot;total_fake_na&quot;])
+total_mean_square_error_mice</code></pre>
+<pre><code>## [1] 158.8623</code></pre>
 </div>
 </div>
 
