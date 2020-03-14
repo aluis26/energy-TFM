@@ -35,7 +35,7 @@ To imputate the data two methods will performed:
 
 ##Mean method
 
-Taking into acount that the variables in this dataset are time depending. We create a method that impute the missing data from their more closest data available. As we can find either a single value missing in a row or several values representing a day, week or month missing, the method will follow a set of steps to always try to impute the data from the closest values, being them most probably the most similar to the missing one. The data will be group by site_id.
+Taking into acount that the variables in this dataset are time depending. We create a method that impute the missing data from their more closest data available. As we can find either a single value missing in a row or several values representing a day, week or month missing, the method will follow a set of steps to always try to impute the data from the closest values, being the    probably the most similar to the missing one. The data will be group by site_id.
 
 ###Steps:
 1. When a missing value is found, pick the two colindant values from the previous and later hour and make the mean. The result will be the imputed value. 
@@ -45,14 +45,14 @@ Taking into acount that the variables in this dataset are time depending. We cre
 Following this 3 steps we ensure all the missing values are imputed.
 
 #### Generate new variables:
-That is going to be the first step to apply the method. The new columns will contain the data need it for the calculations of the mean.
+That is going to be the first step to apply the method. The new columns will contain the data needed for the calculations of the mean.
 
 ```{r}
 list_var_to_impute <-c("air_temperature","cloud_coverage","dew_temperature","precip_depth_1_hr","sea_level_pressure","wind_direction","wind_speed")
 ```
 
 - Generate new columns for the steps 1 and 2:
-previous_hour, next_hour, previous_day_same_hour and next_day_same_hour for the 7 variables that we need to imputate.
+previous_hour, next_hour, previous_day_same_hour and next_day_same_hour for the 7 variables that we need to impute.
 ```{r}
 #let's create a table "imputation_table" with the new varibles for point 1 and 2 of this method.
 imputation_table <- weather_train 
@@ -242,7 +242,7 @@ To improve the performance of mice all the variables already created for the mea
 ##Study of the perfomance:
 
 Now let's study which of the two imputation methods is better. 
-To do so we will generate fake missing values and apply the two methodologies. Then compare using minimum square error as a metric, which method has a higher accuracy.
+To do so we will generate fake missing values and apply the two methodologies. Then compare using mean square error as a metric, which method has a higher accuracy.
 7000 rows are selected which represent 5% of the total in all the features. 
 
 ```{r}

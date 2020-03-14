@@ -115,7 +115,7 @@ ggplot(total_meter,aes(Meter,Count)) +
     geom_col(position = 'dodge', aes(fill = Meter)) +
     geom_text(aes(label=percentage), vjust=-0.1) + 
     theme(legend.position = "none") +
-    labs(title="Count of meters") +
+    labs(title="Percent of buildings with each data meter") +
     scale_color_brewer(palette = "Dark2")
 
 ```
@@ -162,7 +162,11 @@ train[!is.infinite(train$meter_log),] %>% group_by(meter)%>%
 
 
 ```
+
 According to the graph, the distributions for the four meters seem to be normal. Chilledwater and steam are skewed to the right which can be an indicator of the presence of outliers. Further explorations to determine how to treat this outliers will be done.
+
+##########falta afegir testos de normalitat amb i sense outliers.
+
 
 
 - Distribution of the average meter reading throught the year:
@@ -186,7 +190,7 @@ train %>%
   geom_line() +
   geom_smooth(se = T) +
   facet_wrap(~meter, scales = "free") +
-  ggtitle("Historical daily meter readings per meter type") +
+  ggtitle("Daily history of meter readings per meter type") +
   labs(x= "Reading Date", y= "Sum Reading")
 
 
@@ -205,7 +209,7 @@ train %>%
   labs(x= "Reading Date", y= "Median Reading")
 
 ```
-Et dona una idea la mediana de com varia el consum tipic. Es el punt mig de totes les mesures durant el dia. Es molt robusta a outliers.
+Et dona una idea la mediana de com varia el consum tipic. Es el punt mig de totes les mesures durant el dia. Es molt robusta a outliers. ###### buscar un cita que demostri que la mediana es robusta a outliers
 Veiem clarament que hi ha molta variabilitat i que el tipus de industria influeix molt.
 Per tant fem el merge amb la taula dels buildings i comencem a treballar amb ella
 ```{r}
