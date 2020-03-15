@@ -1,0 +1,22 @@
+---
+title: "models"
+output: html_notebook
+---
+
+models:
+    - Regressió linal, primer amb les dades que ja tenim, estudiant quines son les mes importants i necessaries. Després afegint variables com:
+          - mitjana, maxim, minim i variança de consum per edifici
+          - mitjana, maxim, minim i variança de consum per tipus d'edifici
+          
+    - Random forest regression, amb les mateixes variables i tunejant els paràmetres.
+    - XGboost Regression, amb les mateixes variables i tunejant els paràmetres.
+    
+      
+
+```{r warning=FALSE, results="hide", message=FALSE} 
+#load the data:
+library(readr)
+data_train <- read_csv("data/data_train.csv")
+
+```
+
