@@ -1,5 +1,5 @@
 ---
-title: "models"
+title: "Linear models"
 output: html_notebook
 ---
 
@@ -14,9 +14,36 @@ models:
       
 
 ```{r warning=FALSE, results="hide", message=FALSE} 
-#load the data:
-library(readr)
-data_train <- read_csv("data/data_train.csv")
-
+final_train_data <- read_csv("final_train_data.csv")
+str(final_train_data)
 ```
 
+```{r warning=FALSE, message=FALSE}
+# change type to factor of categorical variable:
+final_train_data$meter = factor(final_train_data$meter)
+final_train_data$site_id = factor(final_train_data$site_id)
+final_train_data$building_id = factor(final_train_data$building_id)
+final_train_data$primary_use = factor(final_train_data$primary_use)
+final_train_data$timestamp_day = factor(final_train_data$timestamp_day)
+final_train_data$timestamp_month = factor(final_train_data$timestamp_month)
+final_train_data$time_hour = factor(final_train_data$time_hour)
+```
+
+```{r warning=FALSE, results="hide", message=FALSE} 
+library(tidyverse)
+library(cvTools)
+library(miscTools)
+```
+
+##Evaluation Metric:
+
+
+```{r warning=FALSE, message=FALSE} 
+RMSLE = function(predicted, target){
+ return (sqrt(mean((log(predicted + 1) - log(target + 1))^2)))
+}
+
+r2 = function (predicted, target){
+  rSquared(target, resid= target - predicted)
+}
+```
