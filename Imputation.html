@@ -158,7 +158,7 @@ library(&quot;tidyverse&quot;)</code></pre>
 </div>
 <div id="mean-method" class="section level2">
 <h2>Mean method</h2>
-<p>Taking into acount that the variables in this dataset are time depending. We create a method that impute the missing data from their more closest data available. As we can find either a single value missing in a row or several values representing a day, week or month missing, the method will follow a set of steps to always try to impute the data from the closest values, being them most probably the most similar to the missing one. The data will be group by site_id.</p>
+<p>Taking into acount that the variables in this dataset are time depending. We create a method that impute the missing data from their more closest data available. As we can find either a single value missing in a row or several values representing a day, week or month missing, the method will follow a set of steps to always try to impute the data from the closest values, being the probably the most similar to the missing one. The data will be group by site_id.</p>
 <div id="steps" class="section level3">
 <h3>Steps:</h3>
 <ol style="list-style-type: decimal">
@@ -169,10 +169,10 @@ library(&quot;tidyverse&quot;)</code></pre>
 <p>Following this 3 steps we ensure all the missing values are imputed.</p>
 <div id="generate-new-variables" class="section level4">
 <h4>Generate new variables:</h4>
-<p>That is going to be the first step to apply the method. The new columns will contain the data need it for the calculations of the mean.</p>
+<p>That is going to be the first step to apply the method. The new columns will contain the data needed for the calculations of the mean.</p>
 <pre class="r"><code>list_var_to_impute &lt;-c(&quot;air_temperature&quot;,&quot;cloud_coverage&quot;,&quot;dew_temperature&quot;,&quot;precip_depth_1_hr&quot;,&quot;sea_level_pressure&quot;,&quot;wind_direction&quot;,&quot;wind_speed&quot;)</code></pre>
 <ul>
-<li>Generate new columns for the steps 1 and 2: previous_hour, next_hour, previous_day_same_hour and next_day_same_hour for the 7 variables that we need to imputate.</li>
+<li>Generate new columns for the steps 1 and 2: previous_hour, next_hour, previous_day_same_hour and next_day_same_hour for the 7 variables that we need to impute.</li>
 </ul>
 <pre class="r"><code>#let's create a table &quot;imputation_table&quot; with the new varibles for point 1 and 2 of this method.
 imputation_table &lt;- weather_train 
@@ -348,7 +348,7 @@ library(VIM)</code></pre>
 </div>
 <div id="study-of-the-perfomance" class="section level2">
 <h2>Study of the perfomance:</h2>
-<p>Now let’s study which of the two imputation methods is better. To do so we will generate fake missing values and apply the two methodologies. Then compare using minimum square error as a metric, which method has a higher accuracy. 7000 rows are selected which represent 5% of the total in all the features.</p>
+<p>Now let’s study which of the two imputation methods is better. To do so we will generate fake missing values and apply the two methodologies. Then compare using mean square error as a metric, which method has a higher accuracy. 7000 rows are selected which represent 5% of the total in all the features.</p>
 <pre class="r"><code>imputation_table_fake_na &lt;- imputation_table_all_variables
 
 #number of values to replace:
