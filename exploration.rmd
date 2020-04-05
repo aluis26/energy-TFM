@@ -378,17 +378,3 @@ In this data set there is some missing data that can be pretty relevant in terms
 
 
 
-########################
-JOIN ALL THE DATA IN ONE TRAINING SET.
-Let's merge the two datasets data_train and weather train:
-
-```{r}
-data_train <- merge(data_train, weather_train, by=c('site_id','timestamp'))
-```
-
-```{r}
- write.csv(data_train, "data_train.csv")
-```
-
-
-

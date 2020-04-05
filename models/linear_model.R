@@ -33,7 +33,7 @@ r2 = function (predicted, target){
 #folds generation
 set.seed(206)
 folds <- cvFolds(NROW(final_train_data), K=5)
-test_ids = folds$subsets[folds$which == 1]
+
 list_subsets_test = list(fold_1= folds$subsets[folds$which == 1], fold_2= folds$subsets[folds$which ==2], fold_3= folds$subsets[folds$which == 3], fold_4= folds$subsets[folds$which == 4], fold_5= folds$subsets[folds$which == 5])
 
 #baseline model. Mean of results per type of meter and building id.
