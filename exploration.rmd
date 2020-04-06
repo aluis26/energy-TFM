@@ -50,12 +50,12 @@ train <- read_csv("data/train.csv")
 ```
 ```{r}
 set.seed(2)
-selected_id <- sample(unique(train$building_id),350, replace=FALSE)
+selected_id <- sample(unique(train$building_id),150, replace=FALSE)
 train <- train[train$building_id %in% selected_id,]
 ```
 We can have some general information about our data set:
 ```{r}
-str(train)
+summary(is.na(train))
 ```
 ```{r}
 summary(train)
@@ -109,14 +109,12 @@ for(i in 1:4){
 
 ```
 
-```{r fig.cap = ""}
+```{r}
 #plot the results:
 ggplot(total_meter,aes(Meter,Count)) + 
     geom_col(position = 'dodge', aes(fill = Meter)) +
     geom_text(aes(label=percentage), vjust=-0.1) + 
-    theme(legend.position = "none") +
-    labs(title="Percent of buildings with each data meter") +
-    scale_color_brewer(palette = "Dark2")
+    theme(legend.position = "none")
 
 ```
 
@@ -134,11 +132,10 @@ train$meter <- plyr::mapvalues(train$meter, from = c(0, 1, 2, 3), to = c("electr
   ggplot(aes(meter_reading)) +
   geom_histogram() +
   theme(legend.position = "none") +
-  ylab("Count") +
-  ggtitle("Distribution of Meter Readings") +
+  ylab("Count") + xlab("Meter Reading")
   facet_wrap(~ meter, scales = "free") +
-  aes(fill= as.factor(meter)) +
-  scale_fill_manual(values = c("#1B9E77","#D95F02","#7570B3","#E7298A"))
+  aes(fill= as.factor(meter))
+
 
 ```
 From the previous graph can be clearly seen how the meter readings for each of the types of meter follow a exponential distribution concentrating their frequency in the lower values.
@@ -154,11 +151,9 @@ train["meter_log"] <- log(train["meter_reading"],10)
 train[!is.infinite(train$meter_log),] %>% group_by(meter)%>%
   ggplot(aes(meter_log)) +
   geom_histogram(aes(fill= as.factor(meter))) +
-  ylab("Count") +
-  ggtitle("Logarithmic Distribution of Meter Readings by meter") +
+  ylab("Count") + xlab("logarithmic meter reading") +
   geom_vline(xintercept = mean(train[!is.infinite(train$meter_log),]$meter_log, na.rm = T)) +
-  facet_wrap(~ meter, scales = "free") + 
-  scale_color_brewer(palette = "Dark2")
+  facet_wrap(~ meter, scales = "free")
 
 
 ```
@@ -190,8 +185,7 @@ train %>%
   geom_line() +
   geom_smooth(se = T) +
   facet_wrap(~meter, scales = "free") +
-  ggtitle("Daily history of meter readings per meter type") +
-  labs(x= "Reading Date", y= "Sum Reading")
+  labs(x= "Reading Date", y= "Sum of reading")
 
 
 ```
@@ -205,8 +199,7 @@ train %>%
   geom_line() +
   geom_smooth(se = T) +
   facet_wrap(~meter, scales = "free") +
-  ggtitle("Historical daily meter readings per meter type") +
-  labs(x= "Reading Date", y= "Median Reading")
+  labs(x= "Reading Date", y= "Median of readings")
 
 ```
 Et dona una idea la mediana de com varia el consum tipic. Es el punt mig de totes les mesures durant el dia. Es molt robusta a outliers. ###### buscar un cita que demostri que la mediana es robusta a outliers
@@ -240,10 +233,8 @@ Estudi de les diferents variables del dataset:
 ```{r}
 building_metadata %>% count(primary_use)%>% 
   ggplot(aes(x= reorder(primary_use, n), y= n)) +
-  geom_col() +
-  theme(legend.position = "none") +
-  ylab("Count") +
-  ggtitle("Count of primary use building") +
+  geom_col(fill = "cadetblue3") +
+  ylab("Count") + xlab("Primary use")+
   coord_flip()
 ```
 
@@ -259,20 +250,17 @@ El segment on es troben concentrats la majoria d'edificis es en la Educació, of
 ```{r}
 building_metadata %>% 
   ggplot(aes(x= square_meters)) +
-  geom_density(adjust = 2, alpha = 0.7) +
-  scale_x_continuous(labels = comma, name = "Building Square Feet") +
-  ggtitle("BUILDING SIZE IS POSITIVELY SKEWED", subtitle = paste0("The median size is ", comma(median(building_metadata$square_meters)), " square meters")) +
-  theme(axis.title.y = element_blank(), axis.text.y = element_blank())
+  geom_density(adjust = 2, alpha = 0.7, fill= "cadetblue3") +
+  scale_x_continuous(labels = comma, name = "Building Square Feet")  
 ```
 
 ```{r fig.cap = ""}
 
 building_metadata%>% group_by(primary_use)%>%
   ggplot(aes(square_meters)) +
-  geom_histogram(aes(x = square_meters, y = ..ncount..)) +
+  geom_histogram(aes(x = square_meters, y = ..ncount.. ), fill="cadetblue3", bins = 15) +
   scale_y_continuous(labels = percent_format())+
-  ylab("Count") +
-  ggtitle("") +
+  ylab("Count") + xlab("Square Meters")+
   facet_wrap(~ primary_use) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
@@ -287,8 +275,8 @@ building_metadata %>%
   group_by(age) %>% 
   summarise(n_buildings = n()) %>%
   ggplot(aes(x= age, y= n_buildings)) +
-  geom_col() +
-  scale_y_continuous(name = "Number Built", breaks = seq(0,60,10)) +
+  geom_col(fill="cadetblue3") +
+  scale_y_continuous(name = "Count", breaks = seq(0,60,10)) +
   scale_x_continuous(name = "Ages", breaks = seq(0,120,10)) 
 
 ```
@@ -310,7 +298,7 @@ building_metadata %>%
   group_by(ageGroup) %>% 
   summarise(n_buildings = n()) %>%
   ggplot(aes(x= ageGroup, y= n_buildings)) +
-  geom_col() +
+  geom_col( aes(fill = ageGroup)) +
   scale_y_continuous(name = "Number Built")
 ```
 
